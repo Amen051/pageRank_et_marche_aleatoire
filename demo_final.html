@@ -1,0 +1,1580 @@
+<!DOCTYPE html>
+<html lang="fr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Démonstrateur PageRank - Du Graphe à la Matrice de Google</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- KaTeX for crisp LaTeX Math Rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" onload="if(window.renderAllKaTeX)renderAllKaTeX();"></script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .font-mono {
+            font-family: 'Fira Code', monospace;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 3px;
+        }
+        .matrix-cell {
+            transition: all 0.15s ease;
+        }
+        .matrix-cell:hover {
+            transform: scale(1.08);
+            z-index: 20;
+        }
+        .math-tex {
+            display: inline-block;
+        }
+
+        /* LIGHT THEME OVERRIDES */
+        html.light body {
+            background-color: #f1f5f9 !important;
+            color: #0f172a !important;
+        }
+        html.light header {
+            background-color: rgba(255, 255, 255, 0.92) !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06) !important;
+        }
+        html.light footer {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            color: #64748b !important;
+        }
+        html.light nav {
+            background-color: #e2e8f0 !important;
+            border-color: #cbd5e1 !important;
+        }
+        html.light .bg-slate-900,
+        html.light .bg-slate-900\/90 {
+            background-color: #ffffff !important;
+            border-color: #cbd5e1 !important;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+        }
+        html.light .bg-slate-950,
+        html.light .bg-slate-950\/80,
+        html.light .bg-slate-950\/90 {
+            background-color: #f8fafc !important;
+            border-color: #cbd5e1 !important;
+        }
+        html.light .bg-slate-800 {
+            background-color: #e2e8f0 !important;
+            border-color: #cbd5e1 !important;
+            color: #1e293b !important;
+        }
+        html.light .hover\:bg-slate-700:hover,
+        html.light .hover\:bg-slate-900:hover {
+            background-color: #cbd5e1 !important;
+            color: #0f172a !important;
+        }
+        html.light .text-white {
+            color: #0f172a !important;
+        }
+        html.light .bg-sky-600.text-white,
+        html.light .bg-sky-600 .text-white {
+            color: #ffffff !important;
+        }
+        html.light .text-slate-100,
+        html.light .text-slate-200 {
+            color: #1e293b !important;
+        }
+        html.light .text-slate-300 {
+            color: #334155 !important;
+        }
+        html.light .text-slate-400 {
+            color: #475569 !important;
+        }
+        html.light .text-slate-500 {
+            color: #64748b !important;
+        }
+        html.light .border-slate-800,
+        html.light .border-slate-800\/80,
+        html.light .border-slate-700 {
+            border-color: #cbd5e1 !important;
+        }
+        html.light .text-sky-400,
+        html.light .text-sky-300 {
+            color: #0284c7 !important;
+        }
+        html.light .text-sky-200 {
+            color: #0369a1 !important;
+        }
+        html.light .text-amber-400,
+        html.light .text-amber-300 {
+            color: #b45309 !important;
+        }
+        html.light .text-emerald-400,
+        html.light .text-emerald-300 {
+            color: #047857 !important;
+        }
+        html.light .text-red-400 {
+            color: #b91c1c !important;
+        }
+        html.light .text-purple-400 {
+            color: #6d28d9 !important;
+        }
+        html.light .bg-slate-900\/40 {
+            background-color: #ffffff !important;
+            color: #1e293b !important;
+        }
+        html.light ::-webkit-scrollbar-track {
+            background: #e2e8f0;
+        }
+        html.light ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden selection:bg-sky-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-50 px-4 py-3 shadow-xl">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2.5 bg-sky-500/10 border border-sky-500/30 rounded-xl text-sky-400">
+                    <i class="fa-solid fa-diagram-project text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight flex items-center gap-2">
+                        Démonstrateur PageRank
+                        <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">7 Nœuds</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Lien entre une marche aléatoire sur un graphe et l'algo de PageRank </p>
+                </div>
+                <button id="btn-theme-toggle" onclick="toggleTheme()" class="ml-2 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1.5 transition shadow-sm" title="Basculer thème clair / sombre">
+                    <i id="theme-icon" class="fa-solid fa-sun text-amber-400"></i>
+                    <span id="theme-label">Thème clair</span>
+                </button>
+            </div>
+
+            <!-- Navigation Steps -->
+            <nav class="flex flex-wrap items-center bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-medium shadow-inner gap-1">
+                <button id="btn-step-1" onclick="setStep(1)" class="px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 bg-sky-600 text-white shadow-md font-semibold">
+                    <span class="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs">1</span>
+                    <span>1. Graphe &amp; Matrice <span id="nav-tex-p1" class="math-tex">P</span></span>
+                </button>
+                <button id="btn-step-2" onclick="setStep(2)" class="px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900">
+                    <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs">2</span>
+                    <span>2. Anomalies du Web</span>
+                </button>
+                <button id="btn-step-3" onclick="setStep(3)" class="px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900">
+                    <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs">3</span>
+                    <span>3. Saut Aléatoire &amp; <span id="nav-tex-g" class="math-tex">G</span></span>
+                </button>
+                <button id="btn-step-4" onclick="setStep(4)" class="px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900">
+                    <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs">4</span>
+                    <span>4. Marche Aléatoire &amp; PageRank</span>
+                </button>
+                <button id="btn-step-5" onclick="setStep(5)" class="px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900">
+                    <span class="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs">5</span>
+                    <span>5. Complexité &amp; Convergence</span>
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-7xl mx-auto w-full p-4 flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT PANEL: Interactive Web Graph (Hidden in Step 5) -->
+        <section id="left-graph-section" class="lg:col-span-6 flex flex-col gap-4">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col flex-1 shadow-2xl relative overflow-hidden">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-network-wired text-sky-400"></i> Graphe Web (<span class="math-tex">N=7</span>)
+                    </h2>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-toggle-teleport" onclick="toggleTeleportationLinks()" class="hidden text-xs bg-slate-800 hover:bg-slate-700 text-sky-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-eye text-sky-400"></i>
+                            <span id="teleport-btn-text">Masquer arcs de saut</span>
+                        </button>
+                        <button id="btn-random-surfer" onclick="toggleRandomSurfer()" class="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
+                            <i class="fa-solid fa-person-walking"></i>
+                            <span id="surfer-btn-text">Simuler Surfeur</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Container -->
+                <div class="relative flex-1 min-h-[420px] bg-slate-950/80 rounded-xl border border-slate-800/80 overflow-hidden flex items-center justify-center shadow-inner">
+                    <canvas id="graphCanvas" class="w-full h-full cursor-grab active:cursor-grabbing"></canvas>
+                    
+                    <!-- Graph overlay help -->
+                    <div class="absolute bottom-3 left-3 bg-slate-900/90 border border-slate-800 text-[11px] px-3 py-1.5 rounded-lg text-slate-400 backdrop-blur-md pointer-events-none shadow-lg">
+                        <i class="fa-solid fa-hand-pointer mr-1 text-slate-500"></i> Nœuds déplaçables à la souris
+                    </div>
+
+                    <!-- Surfer state tooltip overlay -->
+                    <div id="surfer-status" class="absolute top-3 left-3 bg-slate-900/90 border border-amber-500/30 text-amber-300 text-xs px-3 py-1.5 rounded-lg backdrop-blur-md hidden shadow-lg flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                        <span id="surfer-status-text">Surfeur sur la page A</span>
+                    </div>
+                </div>
+
+                <!-- Step-specific graph legend -->
+                <div id="graph-legend" class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs"></div>
+            </div>
+        </section>
+
+        <!-- RIGHT PANEL: Matrix View, Approaches & Convergence -->
+        <section id="right-main-section" class="lg:col-span-6 flex flex-col gap-4">
+            
+            <!-- Dynamic Matrix Box (Steps 1, 2, 3) -->
+            <div id="matrix-card" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-2xl">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 id="matrix-title" class="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-table-cells text-sky-400"></i> Matrice de Transition Brute (<span class="math-tex">P</span>)
+                    </h2>
+                    <span id="matrix-badge" class="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-400 border border-slate-700">Matrice Sous-Stochastique</span>
+                </div>
+
+                <!-- Matrix Type Selector (Step 3) -->
+                <div id="matrix-selector-step3" class="hidden mb-3 flex items-center gap-2 text-xs">
+                    <span class="text-slate-400 font-medium">Afficher la matrice :</span>
+                    <button id="mat-btn-P" onclick="setMatrixView('P')" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700">Brute <span id="tex-btn-p" class="math-tex">P</span></button>
+                    <button id="mat-btn-Pstar" onclick="setMatrixView('Pstar')" class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700">Puits Corrigés <span id="tex-btn-pstar" class="math-tex">P^*</span></button>
+                    <button id="mat-btn-G" onclick="setMatrixView('G')" class="px-2.5 py-1 rounded bg-sky-600 text-white font-semibold shadow">Google <span id="tex-btn-g" class="math-tex">G</span></button>
+                </div>
+
+                <!-- Transition Matrix Display -->
+                <div class="overflow-x-auto p-2 bg-slate-950/80 rounded-xl border border-slate-800/80 shadow-inner">
+                    <div id="matrix-container" class="flex justify-center items-center min-h-[220px]"></div>
+                </div>
+
+                <!-- Teleportation Controls (Step 3 only) -->
+                <div id="teleportation-controls" class="hidden mt-3 p-3 bg-slate-950/90 rounded-xl border border-slate-800 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label for="damping-slider" class="text-xs font-semibold text-slate-300 flex items-center gap-2">
+                            <span>Facteur d'amortissement (<span id="tex-slider-d" class="math-tex">d</span>) :</span>
+                        </label>
+                        <span id="damping-value" class="font-mono text-sm font-bold text-sky-400 bg-sky-500/10 px-2.5 py-0.5 rounded border border-sky-500/30">0.85</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-[11px] text-slate-500 font-mono">0.0</span>
+                        <input type="range" id="damping-slider" min="0" max="1" step="0.05" value="0.85" oninput="updateDampingFactor(this.value)" class="w-full accent-sky-500 cursor-pointer">
+                        <span class="text-[11px] text-slate-500 font-mono">1.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4 Panel: Approches Marche Aléatoire (Empirique) vs PageRank (Théorique) -->
+            <div id="step4-panel" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-4 flex-col gap-3 shadow-2xl">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-ranking-star text-amber-400"></i>
+                        Approches : Marche Aléatoire vs PageRank (<span class="math-tex">\\pi</span>)
+                    </h2>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button onclick="runMonteCarloBatch(1)" class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/30 font-medium transition">
+                            +1 pas
+                        </button>
+                        <button onclick="runMonteCarloBatch(500)" class="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-2.5 py-1 rounded-lg border border-amber-500/30 font-medium transition">
+                            +500 pas
+                        </button>
+                        <button onclick="runPowerIterations(1)" class="text-xs bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 px-2.5 py-1 rounded-lg border border-sky-500/30 font-medium transition">
+                            +1 itération
+                        </button>
+                        <button onclick="runPowerIterations(10)" class="text-xs bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 px-2.5 py-1 rounded-lg border border-sky-500/30 font-medium transition">
+                            +10 itérations
+                        </button>
+                        <button onclick="resetApproaches()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded-lg border border-slate-700 transition" title="Réinitialiser">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Summary Counters -->
+                <div class="grid grid-cols-3 gap-2 text-xs">
+                    <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+                        <div class="text-slate-400 text-[11px]">Pas Marche Aléatoire</div>
+                        <div id="mc-total-steps" class="font-mono font-bold text-amber-400 text-sm">0</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+                        <div class="text-slate-400 text-[11px]">Itérations Puissance (<span class="math-tex">k</span>)</div>
+                        <div id="pi-iter-count" class="font-mono font-bold text-sky-400 text-sm">0</div>
+                    </div>
+                    <div class="p-2 rounded-xl bg-slate-950/90 border border-slate-800">
+                        <div class="text-slate-400 text-[11px]">Écart L1 (<span class="math-tex">\\|\\hat{\\pi}-\\pi^*\\|_1</span>)</div>
+                        <div id="mc-l1-error" class="font-mono font-bold text-emerald-400 text-sm">—</div>
+                    </div>
+                </div>
+
+                <!-- Comparison Bars per Node -->
+                <div id="approaches-bars" class="space-y-2 p-3 bg-slate-950/80 rounded-xl border border-slate-800/80">
+                </div>
+
+                <div class="flex flex-wrap items-center justify-between text-[11px] text-slate-400 gap-2">
+                    <div class="flex items-center gap-3">
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-amber-400"></span> Fréquence empirique (Marche aléatoire)</span>
+                        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-sky-400"></span> Itérée théorique <span class="math-tex">\\pi^{(k)}</span></span>
+                        <span class="flex items-center gap-1.5"><span class="w-0.5 h-3 bg-emerald-400"></span> Limite PageRank <span class="math-tex">\\pi^*</span></span>
+                    </div>
+                    <button onclick="convergePowerIteration()" class="text-emerald-400 hover:text-emerald-300 font-semibold underline">
+                        Converger <span class="math-tex">\\pi^*</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 5 Panel: Graphique seul sans le graphe du Web et sans texte en bas -->
+            <div id="step5-panel" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 flex-col gap-5 shadow-2xl flex-1">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-sky-400"></i>
+                        Erreur de Convergence (<span class="math-tex">L_1</span>) vs Coût de Calcul (Opérations)
+                    </h2>
+                    <div class="flex items-center gap-2 text-xs">
+                        <span class="text-slate-400">Amortissement <span class="math-tex">d</span> :</span>
+                        <select id="conv-d-select" onchange="updateConvDamping(this.value)" class="bg-slate-800 border border-slate-700 text-sky-400 font-mono font-bold rounded-lg px-2.5 py-1.5 focus:outline-none">
+                            <option value="0.50">d = 0.50</option>
+                            <option value="0.70">d = 0.70</option>
+                            <option value="0.85" selected>d = 0.85 (Google)</option>
+                            <option value="0.95">d = 0.95</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Two Comparative Cards (PageRank vs Marche Aléatoire) -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="p-4 rounded-xl bg-slate-950/90 border border-sky-500/30">
+                        <div class="flex items-center gap-2 text-xs text-sky-400 font-medium mb-1">
+                            <span class="w-2.5 h-2.5 rounded-full bg-sky-400"></span>
+                            <span class="italic font-mono">PageRank (Power Iteration)</span>
+                        </div>
+                        <div id="pr-cost-precision" class="font-mono font-bold text-2xl text-white">10⁻⁸</div>
+                        <div id="pr-cost-subtitle" class="text-xs text-slate-400 mt-1">Précision à ~15k op. (<span class="math-tex">\\mathcal{O}(d^k)</span>)</div>
+                    </div>
+
+                    <div class="p-4 rounded-xl bg-slate-950/90 border border-slate-700">
+                        <div class="flex items-center gap-2 text-xs text-slate-300 font-medium mb-1">
+                            <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                            <span class="italic font-mono">Marche Aléatoire (Monte-Carlo)</span>
+                        </div>
+                        <div id="mc-cost-precision" class="font-mono font-bold text-2xl text-white">0,029</div>
+                        <div id="mc-cost-subtitle" class="text-xs text-slate-400 mt-1">Erreur à 100k op. (<span class="math-tex">\\mathcal{O}(1/\\sqrt{T})</span>)</div>
+                    </div>
+                </div>
+
+                <!-- Large Convergence Chart Canvas -->
+                <div class="relative bg-slate-950/90 rounded-xl border border-slate-800 p-4 flex-1 flex flex-col justify-center min-h-[340px]">
+                    <canvas id="convergenceCanvas" class="w-full h-[310px]"></canvas>
+                    <div class="mt-3 flex flex-wrap items-center justify-center gap-6 text-xs text-slate-300">
+                        <span class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-sky-400 inline-block"></span>
+                            <span class="italic">PageRank (Power Iteration)</span>
+                        </span>
+                        <span class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full bg-slate-400 inline-block"></span>
+                            <span class="italic">Marche Aléatoire (Monte-Carlo)</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Educational Card (Hidden in Step 5) -->
+            <div id="info-card" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex-1 shadow-2xl flex flex-col justify-between">
+                <div>
+                    <h3 id="info-card-title" class="text-base font-bold text-white mb-2 flex items-center gap-2"></h3>
+                    <div id="info-card-content" class="text-xs md:text-sm text-slate-300 space-y-3 leading-relaxed"></div>
+                </div>
+
+                <div id="info-card-footer" class="mt-4 pt-3 border-t border-slate-800/80 text-xs text-slate-400 flex items-center justify-between"></div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Bottom Footer -->
+    <footer class="border-t border-slate-800/80 bg-slate-950 py-3 text-center text-xs text-slate-500">
+        Démonstrateur Pédagogique PageRank — Théorème de Perron-Frobenius &amp; Marches Aléatoires
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // State Management
+        let isLightTheme = false;
+        function toggleTheme() {
+            isLightTheme = !isLightTheme;
+            const root = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            const label = document.getElementById('theme-label');
+            if (isLightTheme) {
+                root.classList.remove('dark');
+                root.classList.add('light');
+                icon.className = 'fa-solid fa-moon text-indigo-600';
+                label.textContent = 'Thème sombre';
+            } else {
+                root.classList.remove('light');
+                root.classList.add('dark');
+                icon.className = 'fa-solid fa-sun text-amber-400';
+                label.textContent = 'Thème clair';
+            }
+            if (currentStep <= 3) renderMatrix();
+            if (currentStep === 4) renderApproachesUI();
+            if (currentStep === 5) renderConvergenceChart();
+            else drawGraph();
+        }
+
+        let currentStep = 1;
+        let selectedMatrixView = 'G'; // 'P', 'Pstar', 'G'
+        let dampingFactor = 0.85;
+        let isSurferRunning = false;
+        let surferNode = 0;
+        let surferInterval = null;
+        let hoverEdge = null;
+        let showTeleportLinks = true;
+
+        // 7 Nodes Graph Layout & Topology
+        const nodes = [
+            { id: 0, label: 'A', x: 0.15, y: 0.25, component: 1, type: 'normal' },
+            { id: 1, label: 'B', x: 0.35, y: 0.25, component: 1, type: 'normal' },
+            { id: 2, label: 'C', x: 0.25, y: 0.65, component: 1, type: 'sink' },     // PUITS
+            { id: 3, label: 'D', x: 0.60, y: 0.25, component: 2, type: 'trap' },     // CYCLE D <-> E
+            { id: 4, label: 'E', x: 0.85, y: 0.25, component: 2, type: 'trap' },     // CYCLE E <-> D
+            { id: 5, label: 'F', x: 0.60, y: 0.70, component: 2, type: 'isolated' }, // ISOLÉ F <-> G
+            { id: 6, label: 'G', x: 0.85, y: 0.70, component: 2, type: 'isolated' }  // ISOLÉ G <-> F
+        ];
+
+        // Edges definition (From -> To)
+        const edges = [
+            { from: 0, to: 1 }, // A -> B
+            { from: 1, to: 0 }, // B -> A
+            { from: 0, to: 2 }, // A -> C (Sink)
+            { from: 1, to: 2 }, // B -> C (Sink)
+            { from: 3, to: 4 }, // D -> E
+            { from: 4, to: 3 }, // E -> D (Cycle fermé sans arc sortant)
+            { from: 5, to: 6 }, // F -> G
+            { from: 6, to: 5 }, // G -> F
+            { from: 5, to: 3 }  // F -> D (entre dans le cycle D <-> E sans en sortir)
+        ];
+
+        // Canvas Setup
+        const canvas = document.getElementById('graphCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            if (currentStep !== 5 && canvas.parentElement) {
+                const rect = canvas.parentElement.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    canvas.width = rect.width;
+                    canvas.height = rect.height;
+                    drawGraph();
+                }
+            }
+            if (currentStep === 5) renderConvergenceChart();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Raw Stochastic Matrix P
+        function getTransitionMatrixP() {
+            const N = nodes.length;
+            let P = Array(N).fill(0).map(() => Array(N).fill(0));
+
+            nodes.forEach(node => {
+                const outEdges = edges.filter(e => e.from === node.id);
+                if (outEdges.length > 0) {
+                    const prob = 1 / outEdges.length;
+                    outEdges.forEach(e => {
+                        P[node.id][e.to] = prob;
+                    });
+                }
+            });
+            return P;
+        }
+
+        // Corrected Matrix P* (Sink nodes row replaced with 1/N)
+        function getCorrectedMatrixPStar() {
+            let PStar = getTransitionMatrixP();
+            const N = nodes.length;
+
+            nodes.forEach(node => {
+                const outEdges = edges.filter(e => e.from === node.id);
+                if (outEdges.length === 0) {
+                    for (let j = 0; j < N; j++) {
+                        PStar[node.id][j] = 1 / N;
+                    }
+                }
+            });
+            return PStar;
+        }
+
+        // Google Matrix G = d * P* + (1-d)/N * E
+        function getGoogleMatrixG() {
+            const N = nodes.length;
+            const Pstar = getCorrectedMatrixPStar();
+            let G = Array(N).fill(0).map(() => Array(N).fill(0));
+            const teleportProb = (1 - dampingFactor) / N;
+
+            for (let i = 0; i < N; i++) {
+                for (let j = 0; j < N; j++) {
+                    G[i][j] = dampingFactor * Pstar[i][j] + teleportProb;
+                }
+            }
+            return G;
+        }
+
+        // Helper: check if an edge has a reverse edge (for symmetric curved arcs)
+        function hasReverseEdge(from, to) {
+            return edges.some(e => e.from === to && e.to === from);
+        }
+
+        // GRAPH CANVAS DRAWING (Styled like clean dashed curved arrows & crisp nodes)
+        function drawGraph() {
+            if (currentStep === 5) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Step 2 Visual Component Background Regions
+            if (currentStep === 2) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.04)';
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([6, 6]);
+                ctx.beginPath();
+                ctx.roundRect(w * 0.06, h * 0.11, w * 0.38, h * 0.76, 16);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#38bdf8';
+                ctx.font = '600 11px Inter, sans-serif';
+                ctx.fillText('Composante 1 {A, B, C}', w * 0.09, h * 0.16);
+
+                ctx.fillStyle = 'rgba(249, 115, 22, 0.04)';
+                ctx.strokeStyle = 'rgba(249, 115, 22, 0.25)';
+                ctx.beginPath();
+                ctx.roundRect(w * 0.50, h * 0.11, w * 0.44, h * 0.76, 16);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = '#fb923c';
+                ctx.fillText('Composante 2 {D, E, F, G}', w * 0.53, h * 0.16);
+                ctx.restore();
+            }
+
+            // Draw Teleportation Links & Self-Loops (Step 3)
+            if (currentStep === 3 && showTeleportLinks) {
+                ctx.save();
+                ctx.lineWidth = 1.25;
+                ctx.setLineDash([3, 4]);
+
+                for (let i = 0; i < nodes.length; i++) {
+                    for (let j = 0; j < nodes.length; j++) {
+                        const p1 = { x: nodes[i].x * w, y: nodes[i].y * h };
+                        const p2 = { x: nodes[j].x * w, y: nodes[j].y * h };
+
+                        if (i === j) {
+                            ctx.strokeStyle = 'rgba(244, 63, 94, 0.75)';
+                            ctx.fillStyle = 'rgba(244, 63, 94, 0.75)';
+                            
+                            const loopRadius = 14;
+                            const loopCenterX = p1.x;
+                            const loopCenterY = p1.y - 28;
+
+                            ctx.beginPath();
+                            ctx.arc(loopCenterX, loopCenterY, loopRadius, 0, Math.PI * 2);
+                            ctx.stroke();
+
+                            ctx.beginPath();
+                            ctx.arc(loopCenterX + loopRadius, loopCenterY, 2.8, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else {
+                            ctx.strokeStyle = 'rgba(168, 85, 247, 0.28)';
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                ctx.restore();
+            }
+
+            // Compute PageRank scores for node sizing & inside percentages
+            const piScores = computeStationaryPi(dampingFactor);
+            const getNodeRadius = (nodeId) => {
+                if (currentStep === 4) {
+                    return 21 + piScores[nodeId] * 55;
+                }
+                return 25;
+            };
+
+            // Draw Direct Edges (Dashed clean arrows with symmetric Bézier curves for bidirectional pairs)
+            edges.forEach(edge => {
+                const source = nodes.find(n => n.id === edge.from);
+                const target = nodes.find(n => n.id === edge.to);
+
+                const startX = source.x * w;
+                const startY = source.y * h;
+                const endX = target.x * w;
+                const endY = target.y * h;
+
+                const rSource = getNodeRadius(source.id);
+                const rTarget = getNodeRadius(target.id);
+                const isBidirectional = hasReverseEdge(edge.from, edge.to);
+
+                let strokeStyle = '#64748b';
+                let lineWidth = 2;
+
+                if (hoverEdge && hoverEdge.from === edge.from && hoverEdge.to === edge.to) {
+                    strokeStyle = '#f59e0b';
+                    lineWidth = 3.5;
+                } else if (currentStep === 2) {
+                    if (target.type === 'sink') {
+                        strokeStyle = '#f87171';
+                        lineWidth = 2.5;
+                    } else if (source.type === 'trap' && target.type === 'trap') {
+                        strokeStyle = '#fb923c';
+                        lineWidth = 2.5;
+                    } else if (source.type === 'isolated' || target.type === 'isolated') {
+                        strokeStyle = '#c084fc';
+                        lineWidth = 2.5;
+                    }
+                } else if (currentStep === 3) {
+                    strokeStyle = '#38bdf8';
+                    lineWidth = 2.2;
+                } else if (currentStep === 4) {
+                    strokeStyle = '#94a3b8';
+                    lineWidth = 2;
+                }
+
+                drawDashedArrow(startX, startY, endX, endY, rSource, rTarget, strokeStyle, lineWidth, isBidirectional);
+            });
+
+            // Draw Nodes (Crisp circle, optional outer dashed ring for active surfer, label + % inside)
+            nodes.forEach(node => {
+                const nx = node.x * w;
+                const ny = node.y * h;
+                const radius = getNodeRadius(node.id);
+                const isActiveSurfer = (isSurferRunning || currentStep === 4) && surferNode === node.id;
+
+                ctx.save();
+
+                // Outer dashed halo ring when surfer is on this node
+                if (isActiveSurfer) {
+                    ctx.beginPath();
+                    ctx.arc(nx, ny, radius + 7, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
+                    ctx.lineWidth = 2.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // Main Node Circle
+                ctx.beginPath();
+                ctx.arc(nx, ny, radius, 0, Math.PI * 2);
+
+                let fillColor = isLightTheme ? '#ffffff' : '#1e293b';
+                let borderColor = isLightTheme ? '#475569' : '#64748b';
+                let labelColor = isLightTheme ? '#0f172a' : '#f8fafc';
+                let subColor = isLightTheme ? '#475569' : '#94a3b8';
+
+                if (isActiveSurfer) {
+                    fillColor = isLightTheme ? 'rgba(2, 132, 199, 0.16)' : 'rgba(14, 165, 233, 0.22)';
+                    borderColor = isLightTheme ? '#0284c7' : '#38bdf8';
+                    labelColor = isLightTheme ? '#0c4a6e' : '#ffffff';
+                    subColor = isLightTheme ? '#0369a1' : '#7dd3fc';
+                } else if (currentStep === 2) {
+                    if (node.type === 'sink') {
+                        fillColor = isLightTheme ? '#fee2e2' : 'rgba(239, 68, 68, 0.16)';
+                        borderColor = '#ef4444';
+                        subColor = isLightTheme ? '#b91c1c' : '#fca5a5';
+                    } else if (node.type === 'trap') {
+                        fillColor = isLightTheme ? '#ffedd5' : 'rgba(249, 115, 22, 0.16)';
+                        borderColor = '#f97316';
+                        subColor = isLightTheme ? '#c2410c' : '#fdba74';
+                    } else if (node.type === 'isolated') {
+                        fillColor = isLightTheme ? '#f3e8ff' : 'rgba(168, 85, 247, 0.16)';
+                        borderColor = '#a855f7';
+                        subColor = isLightTheme ? '#6d28d9' : '#d8b4fe';
+                    }
+                } else if (currentStep === 3) {
+                    if (node.type === 'sink') {
+                        fillColor = isLightTheme ? '#fee2e2' : 'rgba(239, 68, 68, 0.14)';
+                        borderColor = '#ef4444';
+                    } else {
+                        fillColor = isLightTheme ? '#e0f2fe' : '#1e293b';
+                        borderColor = isLightTheme ? '#0284c7' : '#38bdf8';
+                    }
+                } else if (currentStep === 4) {
+                    if (node.type === 'sink') {
+                        fillColor = isLightTheme ? '#fee2e2' : 'rgba(239, 68, 68, 0.14)';
+                        borderColor = '#ef4444';
+                        subColor = isLightTheme ? '#b91c1c' : '#fca5a5';
+                    } else {
+                        fillColor = isLightTheme ? '#ffffff' : '#1e293b';
+                        borderColor = isLightTheme ? '#475569' : '#64748b';
+                    }
+                }
+
+                ctx.fillStyle = fillColor;
+                ctx.fill();
+                ctx.lineWidth = isActiveSurfer ? 3 : 2.2;
+                ctx.strokeStyle = borderColor;
+                ctx.stroke();
+
+                // Node Label + Percentage inside (when in Step 3 or Step 4)
+                const showPercentInside = (currentStep === 3 || currentStep === 4);
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                if (showPercentInside) {
+                    ctx.fillStyle = labelColor;
+                    ctx.font = 'bold 14px Inter, sans-serif';
+                    ctx.fillText(node.label, nx, ny - 6);
+
+                    ctx.fillStyle = subColor;
+                    ctx.font = '600 11px Fira Code, monospace';
+                    ctx.fillText(`${Math.round(piScores[node.id] * 100)}%`, nx, ny + 9);
+                } else {
+                    ctx.fillStyle = labelColor;
+                    ctx.font = 'bold 15px Inter, sans-serif';
+                    ctx.fillText(node.label, nx, ny);
+                }
+
+                ctx.restore();
+            });
+        }
+
+        // Helper: Dashed straight or curved arrow with crisp triangular head
+        function drawDashedArrow(fromx, fromy, tox, toy, rSource, rTarget, strokeStyle, lineWidth, isCurved) {
+            const headlen = 9;
+            const dx = tox - fromx;
+            const dy = toy - fromy;
+            const dist = Math.hypot(dx, dy);
+            if (dist < 1) return;
+
+            const angle = Math.atan2(dy, dx);
+            const perpX = -Math.sin(angle);
+            const perpY = Math.cos(angle);
+
+            ctx.save();
+            ctx.strokeStyle = strokeStyle;
+            ctx.fillStyle = strokeStyle;
+            ctx.lineWidth = lineWidth;
+
+            if (!isCurved) {
+                const startX = fromx + (rSource + 3) * Math.cos(angle);
+                const startY = fromy + (rSource + 3) * Math.sin(angle);
+                const endX = tox - (rTarget + 5) * Math.cos(angle);
+                const endY = toy - (rTarget + 5) * Math.sin(angle);
+
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                drawArrowHead(endX, endY, angle, headlen);
+            } else {
+                // Symmetric quadratic Bézier curve so A->B and B->A never overlap
+                const curveOffset = Math.min(26, dist * 0.22);
+                const midX = (fromx + tox) / 2 + perpX * curveOffset;
+                const midY = (fromy + toy) / 2 + perpY * curveOffset;
+
+                const startAngle = Math.atan2(midY - fromy, midX - fromx);
+                const endAngle = Math.atan2(toy - midY, tox - midX);
+
+                const startX = fromx + (rSource + 3) * Math.cos(startAngle);
+                const startY = fromy + (rSource + 3) * Math.sin(startAngle);
+                const endX = tox - (rTarget + 5) * Math.cos(endAngle);
+                const endY = toy - (rTarget + 5) * Math.sin(endAngle);
+
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.quadraticCurveTo(midX, midY, endX, endY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                drawArrowHead(endX, endY, endAngle, headlen);
+            }
+
+            ctx.restore();
+        }
+
+        function drawArrowHead(tipX, tipY, angle, headlen) {
+            ctx.beginPath();
+            ctx.moveTo(tipX, tipY);
+            ctx.lineTo(tipX - headlen * Math.cos(angle - Math.PI / 6.5), tipY - headlen * Math.sin(angle - Math.PI / 6.5));
+            ctx.lineTo(tipX - headlen * Math.cos(angle + Math.PI / 6.5), tipY - headlen * Math.sin(angle + Math.PI / 6.5));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // RENDER MATRIX TABLE
+        function renderMatrix() {
+            const container = document.getElementById('matrix-container');
+            let M = [];
+            let matrixLabel = "P";
+            
+            if (currentStep === 1 || currentStep === 2) {
+                M = getTransitionMatrixP();
+                matrixLabel = "P";
+            } else {
+                if (selectedMatrixView === 'P') M = getTransitionMatrixP();
+                else if (selectedMatrixView === 'Pstar') M = getCorrectedMatrixPStar();
+                else M = getGoogleMatrixG();
+                matrixLabel = selectedMatrixView === 'G' ? 'G' : (selectedMatrixView === 'Pstar' ? 'P^*' : 'P');
+            }
+
+            const N = nodes.length;
+            let html = '<table class="border-collapse font-mono text-[11px] md:text-xs text-center select-none">';
+            
+            html += `<thead><tr><th class="p-1 text-slate-500 font-normal"><span id="tex-mat-lbl" class="math-tex">${matrixLabel}</span> =</th>`;
+            for (let j = 0; j < N; j++) {
+                html += `<th class="p-1.5 font-bold text-sky-400 border-b border-slate-800">Vers ${nodes[j].label}</th>`;
+            }
+            html += '</tr></thead><tbody>';
+
+            for (let i = 0; i < N; i++) {
+                html += `<tr><td class="p-1.5 font-bold text-sky-400 border-r border-slate-800">De ${nodes[i].label}</td>`;
+                for (let j = 0; j < N; j++) {
+                    const val = M[i][j];
+                    let cellBg = 'bg-slate-900/40 text-slate-300';
+                    let tooltip = `De ${nodes[i].label} vers ${nodes[j].label} : ${val.toFixed(3)}`;
+
+                    if (currentStep === 2) {
+                        if (nodes[i].type === 'sink') {
+                            cellBg = 'bg-red-500/20 text-red-400 border border-red-500/30';
+                            tooltip = 'Ligne Puits (Somme = 0)';
+                        } else if (nodes[i].component === 1 && nodes[j].component === 2) {
+                            cellBg = 'bg-slate-950 text-slate-600';
+                        } else if (nodes[i].type === 'trap' && nodes[j].type === 'trap') {
+                            cellBg = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+                        }
+                    } else if (currentStep === 3) {
+                        if (i === 2) {
+                            cellBg = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+                            tooltip = `Ligne du puits C corrigée : constante = 1/${N} = ${(1/N).toFixed(3)}`;
+                        } else {
+                            cellBg = 'bg-sky-500/10 text-sky-200 border border-sky-500/20';
+                        }
+                    }
+
+                    const formattedVal = (currentStep === 3 && selectedMatrixView === 'G') ? val.toFixed(3) : (val === 0 ? '0' : (val === 0.5 ? '1/2' : val.toFixed(3)));
+
+                    html += `<td title="${tooltip}" 
+                                onmouseenter="onCellHover(${i}, ${j})" 
+                                onmouseleave="onCellLeave()"
+                                class="p-1.5 border border-slate-800/80 matrix-cell ${cellBg} font-semibold cursor-pointer">
+                                ${formattedVal}
+                            </td>`;
+                }
+                html += '</tr>';
+            }
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
+
+            renderAllKaTeX();
+        }
+
+        function onCellHover(from, to) {
+            hoverEdge = { from, to };
+            drawGraph();
+        }
+
+        function onCellLeave() {
+            hoverEdge = null;
+            drawGraph();
+        }
+
+        function setMatrixView(view) {
+            selectedMatrixView = view;
+            ['P', 'Pstar', 'G'].forEach(v => {
+                const btn = document.getElementById(`mat-btn-${v}`);
+                if (v === view) {
+                    btn.className = "px-2.5 py-1 rounded bg-sky-600 text-white font-semibold shadow";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700";
+                }
+            });
+            renderMatrix();
+        }
+
+        function toggleTeleportationLinks() {
+            showTeleportLinks = !showTeleportLinks;
+            document.getElementById('teleport-btn-text').textContent = showTeleportLinks ? "Masquer arcs de saut" : "Afficher arcs de saut";
+            drawGraph();
+        }
+
+        function updateDampingFactor(val) {
+            dampingFactor = parseFloat(val);
+            document.getElementById('damping-value').textContent = dampingFactor.toFixed(2);
+            if (currentStep === 3 && selectedMatrixView === 'G') {
+                renderMatrix();
+            }
+            drawGraph();
+        }
+
+        // STATE FOR STEPS 4 & 5 (Approaches & Convergence)
+        let mcVisitCounts = Array(7).fill(0);
+        let mcTotalSteps = 0;
+        let powerPi = Array(7).fill(1 / 7);
+        let powerIter = 0;
+
+        function computeStationaryPi(dVal = dampingFactor) {
+            const N = nodes.length;
+            const Pstar = getCorrectedMatrixPStar();
+            let pi = Array(N).fill(1 / N);
+            const teleport = (1 - dVal) / N;
+
+            for (let iter = 0; iter < 200; iter++) {
+                let nextPi = Array(N).fill(teleport);
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        nextPi[j] += dVal * pi[i] * Pstar[i][j];
+                    }
+                }
+                const diff = nextPi.reduce((acc, v, idx) => acc + Math.abs(v - pi[idx]), 0);
+                pi = nextPi;
+                if (diff < 1e-12) break;
+            }
+            return pi;
+        }
+
+        function resetApproaches() {
+            const N = nodes.length;
+            mcVisitCounts = Array(N).fill(0);
+            mcTotalSteps = 0;
+            powerPi = Array(N).fill(1 / N);
+            powerIter = 0;
+            surferNode = 0;
+            renderApproachesUI();
+            drawGraph();
+        }
+
+        function runMonteCarloBatch(steps = 500) {
+            const G = getGoogleMatrixG();
+            const N = nodes.length;
+            for (let s = 0; s < steps; s++) {
+                const probs = G[surferNode];
+                const r = Math.random();
+                let cum = 0;
+                let next = surferNode;
+                for (let j = 0; j < N; j++) {
+                    cum += probs[j];
+                    if (r <= cum) {
+                        next = j;
+                        break;
+                    }
+                }
+                surferNode = next;
+                mcVisitCounts[surferNode]++;
+                mcTotalSteps++;
+            }
+            if (isSurferRunning) updateSurferStatus();
+            renderApproachesUI();
+            drawGraph();
+        }
+
+        function stepPowerIteration(skipRender = false) {
+            const G = getGoogleMatrixG();
+            const N = nodes.length;
+            let nextPi = Array(N).fill(0);
+            for (let j = 0; j < N; j++) {
+                for (let i = 0; i < N; i++) {
+                    nextPi[j] += powerPi[i] * G[i][j];
+                }
+            }
+            powerPi = nextPi;
+            powerIter++;
+            if (!skipRender) {
+                renderApproachesUI();
+                drawGraph();
+            }
+        }
+
+        function runPowerIterations(count) {
+            for (let k = 0; k < count; k++) {
+                stepPowerIteration(true);
+            }
+            renderApproachesUI();
+            drawGraph();
+        }
+
+        function convergePowerIteration() {
+            for (let k = 0; k < 50; k++) {
+                stepPowerIteration();
+            }
+        }
+
+        function renderApproachesUI() {
+            const container = document.getElementById('approaches-bars');
+            if (!container) return;
+            const piStar = computeStationaryPi(dampingFactor);
+            const N = nodes.length;
+
+            document.getElementById('mc-total-steps').textContent = mcTotalSteps.toLocaleString('fr-FR');
+            document.getElementById('pi-iter-count').textContent = powerIter;
+
+            let l1Err = 0;
+            let html = '';
+            const maxScale = 0.35;
+
+            for (let i = 0; i < N; i++) {
+                const emp = mcTotalSteps > 0 ? mcVisitCounts[i] / mcTotalSteps : 0;
+                const theo = powerPi[i];
+                const exact = piStar[i];
+                if (mcTotalSteps > 0) l1Err += Math.abs(emp - exact);
+
+                const empPct = Math.min(100, (emp / maxScale) * 100);
+                const theoPct = Math.min(100, (theo / maxScale) * 100);
+                const exactPct = Math.min(100, (exact / maxScale) * 100);
+
+                html += `
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between text-[11px]">
+                            <span class="font-bold text-slate-200">Page ${nodes[i].label}</span>
+                            <div class="flex items-center gap-2 font-mono">
+                                <span class="text-amber-400" title="Fréquence empirique">${mcTotalSteps > 0 ? (emp * 100).toFixed(1) + '%' : '—'}</span>
+                                <span class="text-slate-600">|</span>
+                                <span class="text-sky-400" title="Itérée théorique k=${powerIter}">${(theo * 100).toFixed(1)}%</span>
+                                <span class="text-slate-600">|</span>
+                                <span class="text-emerald-400 font-semibold" title="Score PageRank exact">${(exact * 100).toFixed(1)}%</span>
+                            </div>
+                        </div>
+                        <div class="relative h-3 bg-slate-900 rounded-md overflow-hidden border border-slate-800">
+                            <div style="width: ${theoPct}%" class="absolute top-0 left-0 h-1.5 bg-sky-400/90 transition-all duration-200"></div>
+                            <div style="width: ${empPct}%" class="absolute bottom-0 left-0 h-1.5 bg-amber-400/90 transition-all duration-200"></div>
+                            <div style="left: ${exactPct}%" class="absolute top-0 bottom-0 w-0.5 bg-emerald-400 z-10 shadow"></div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            document.getElementById('mc-l1-error').textContent = mcTotalSteps > 0 ? l1Err.toFixed(4) : '—';
+            container.innerHTML = html;
+        }
+
+        function updateConvDamping(val) {
+            dampingFactor = parseFloat(val);
+            const slider = document.getElementById('damping-slider');
+            if (slider) slider.value = dampingFactor;
+            const dValSpan = document.getElementById('damping-value');
+            if (dValSpan) dValSpan.textContent = dampingFactor.toFixed(2);
+            renderConvergenceChart();
+        }
+
+        // STEP 5 CONVERGENCE CHART (Erreur L1 vs Coût de Calcul en Opérations)
+        function renderConvergenceChart() {
+            const convCanvas = document.getElementById('convergenceCanvas');
+            if (!convCanvas) return;
+            const rect = convCanvas.parentElement.getBoundingClientRect();
+            convCanvas.width = Math.max(400, rect.width - 32);
+            convCanvas.height = 310;
+
+            const cctx = convCanvas.getContext('2d');
+            const w = convCanvas.width;
+            const h = convCanvas.height;
+            cctx.clearRect(0, 0, w, h);
+
+            const dVal = dampingFactor;
+            const piStar = computeStationaryPi(dVal);
+            const N = nodes.length;
+            const Pstar = getCorrectedMatrixPStar();
+            const teleport = (1 - dVal) / N;
+
+            const opsPerIter = 220;
+            let pi = Array(N).fill(1 / N);
+            let prPoints = [];
+            for (let k = 0; k <= 120; k++) {
+                const ops = Math.max(100, k * opsPerIter);
+                const err = pi.reduce((acc, v, idx) => acc + Math.abs(v - piStar[idx]), 0);
+                if (ops <= 25000 && err >= 1e-9) {
+                    prPoints.push({ ops, err: Math.max(err, 1e-9) });
+                }
+                let nextPi = Array(N).fill(teleport);
+                for (let i = 0; i < N; i++) {
+                    for (let j = 0; j < N; j++) {
+                        nextPi[j] += dVal * pi[i] * Pstar[i][j];
+                    }
+                }
+                pi = nextPi;
+            }
+
+            const point15k = prPoints.find(p => p.ops >= 15000) || prPoints[prPoints.length - 1];
+            const expPower = Math.round(Math.log10(point15k.err));
+            document.getElementById('pr-cost-precision').textContent = `10^${expPower}`.replace('^-', '⁻');
+            document.getElementById('pr-cost-subtitle').innerHTML = `Précision à ~${Math.round(point15k.ops/1000)}k op. (<span class="math-tex">\\mathcal{O}(d^k)</span>)`;
+            renderAllKaTeX();
+
+            const mcOpsList = [100, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000];
+            const mcPoints = mcOpsList.map(ops => ({
+                ops,
+                err: 9.2 / Math.sqrt(ops)
+            }));
+
+            const padL = 62, padR = 28, padT = 20, padB = 46;
+            const plotW = w - padL - padR;
+            const plotH = h - padT - padB;
+            const minLogX = 2;
+            const maxLogX = 5;
+            const minLogY = -9;
+            const maxLogY = 0.3;
+
+            const toX = (ops) => padL + ((Math.log10(ops) - minLogX) / (maxLogX - minLogX)) * plotW;
+            const toY = (err) => padT + ((maxLogY - Math.log10(err)) / (maxLogY - minLogY)) * plotH;
+
+            cctx.strokeStyle = isLightTheme ? '#cbd5e1' : '#1e293b';
+            cctx.lineWidth = 1;
+            cctx.font = '11px Fira Code, monospace';
+            cctx.fillStyle = isLightTheme ? '#475569' : '#94a3b8';
+            cctx.textAlign = 'right';
+
+            [-1, -3, -5, -7, -9].forEach(lg => {
+                const y = padT + ((maxLogY - lg) / (maxLogY - minLogY)) * plotH;
+                cctx.beginPath();
+                cctx.moveTo(padL, y);
+                cctx.lineTo(w - padR, y);
+                cctx.stroke();
+                cctx.fillText(`10^${lg}`, padL - 10, y + 4);
+            });
+
+            cctx.textAlign = 'center';
+            [
+                { val: 100, lbl: '100' },
+                { val: 1000, lbl: '1k' },
+                { val: 10000, lbl: '10k' },
+                { val: 100000, lbl: '100k' }
+            ].forEach(tick => {
+                const x = toX(tick.val);
+                cctx.fillText(tick.lbl, x, h - 22);
+            });
+
+            cctx.fillStyle = isLightTheme ? '#1e293b' : '#cbd5e1';
+            cctx.font = '12px Inter, sans-serif';
+            cctx.fillText("Nombre d'opérations (Échelle log)", padL + plotW / 2, h - 4);
+
+            cctx.save();
+            cctx.translate(15, padT + plotH / 2);
+            cctx.rotate(-Math.PI / 2);
+            cctx.fillText("Erreur L₁ (Log)", 0, 0);
+            cctx.restore();
+
+            cctx.save();
+            cctx.strokeStyle = '#64748b';
+            cctx.lineWidth = 2.5;
+            cctx.beginPath();
+            mcPoints.forEach((pt, idx) => {
+                const x = toX(pt.ops);
+                const y = toY(pt.err);
+                if (idx === 0) cctx.moveTo(x, y);
+                else cctx.lineTo(x, y);
+            });
+            cctx.stroke();
+
+            mcPoints.forEach(pt => {
+                const x = toX(pt.ops);
+                const y = toY(pt.err);
+                cctx.beginPath();
+                cctx.arc(x, y, 4.5, 0, Math.PI * 2);
+                cctx.fillStyle = isLightTheme ? '#ffffff' : '#0f172a';
+                cctx.fill();
+                cctx.lineWidth = 2;
+                cctx.strokeStyle = '#94a3b8';
+                cctx.stroke();
+            });
+            cctx.restore();
+
+            cctx.save();
+            cctx.strokeStyle = '#38bdf8';
+            cctx.lineWidth = 3;
+            cctx.beginPath();
+            prPoints.forEach((pt, idx) => {
+                const x = toX(pt.ops);
+                const y = toY(pt.err);
+                if (idx === 0) cctx.moveTo(x, y);
+                else cctx.lineTo(x, y);
+            });
+            cctx.stroke();
+
+            prPoints.filter((_, idx) => idx % 8 === 0 || idx === prPoints.length - 1).forEach(pt => {
+                const x = toX(pt.ops);
+                const y = toY(pt.err);
+                cctx.beginPath();
+                cctx.arc(x, y, 4.5, 0, Math.PI * 2);
+                cctx.fillStyle = isLightTheme ? '#ffffff' : '#0f172a';
+                cctx.fill();
+                cctx.lineWidth = 2.5;
+                cctx.strokeStyle = '#38bdf8';
+                cctx.stroke();
+            });
+            cctx.restore();
+        }
+
+        // STEP SWITCHING LOGIC
+        function setStep(step) {
+            currentStep = step;
+
+            [1, 2, 3, 4, 5].forEach(s => {
+                const btn = document.getElementById(`btn-step-${s}`);
+                if (!btn) return;
+                if (s === step) {
+                    btn.className = "px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 bg-sky-600 text-white shadow-md font-semibold";
+                    btn.querySelector('span').className = "w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-xs";
+                } else {
+                    btn.className = "px-3 py-2 rounded-lg flex items-center gap-1.5 transition-all duration-200 text-slate-400 hover:text-slate-200 hover:bg-slate-900";
+                    btn.querySelector('span').className = "w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center text-xs";
+                }
+            });
+
+            const leftGraphSection = document.getElementById('left-graph-section');
+            const rightMainSection = document.getElementById('right-main-section');
+            const matrixCard = document.getElementById('matrix-card');
+            const step4Panel = document.getElementById('step4-panel');
+            const step5Panel = document.getElementById('step5-panel');
+            const infoCard = document.getElementById('info-card');
+            const matrixBadge = document.getElementById('matrix-badge');
+            const matrixTitle = document.getElementById('matrix-title');
+            const teleControls = document.getElementById('teleportation-controls');
+            const matSelector = document.getElementById('matrix-selector-step3');
+            const teleBtn = document.getElementById('btn-toggle-teleport');
+
+            if (step === 5) {
+                leftGraphSection.classList.add('hidden');
+                rightMainSection.classList.remove('lg:col-span-6');
+                rightMainSection.classList.add('lg:col-span-12');
+                infoCard.classList.add('hidden');
+            } else {
+                leftGraphSection.classList.remove('hidden');
+                rightMainSection.classList.remove('lg:col-span-12');
+                rightMainSection.classList.add('lg:col-span-6');
+                infoCard.classList.remove('hidden');
+            }
+
+            if (step <= 3) {
+                matrixCard.classList.remove('hidden');
+                step4Panel.classList.add('hidden');
+                step4Panel.classList.remove('flex');
+                step5Panel.classList.add('hidden');
+                step5Panel.classList.remove('flex');
+            } else if (step === 4) {
+                matrixCard.classList.add('hidden');
+                step4Panel.classList.remove('hidden');
+                step4Panel.classList.add('flex');
+                step5Panel.classList.add('hidden');
+                step5Panel.classList.remove('flex');
+                teleBtn.classList.add('hidden');
+                renderApproachesUI();
+            } else if (step === 5) {
+                matrixCard.classList.add('hidden');
+                step4Panel.classList.add('hidden');
+                step4Panel.classList.remove('flex');
+                step5Panel.classList.remove('hidden');
+                step5Panel.classList.add('flex');
+                const sel = document.getElementById('conv-d-select');
+                if (sel) sel.value = dampingFactor.toFixed(2);
+                setTimeout(renderConvergenceChart, 15);
+            }
+
+            if (step === 1) {
+                matrixTitle.innerHTML = `<i class="fa-solid fa-table-cells text-sky-400"></i> Matrice de Transition Brute (<span class="math-tex">P</span>)`;
+                matrixBadge.textContent = "Matrice Sous-Stochastique";
+                matrixBadge.className = "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold bg-slate-800 text-slate-400 border border-slate-700";
+                teleControls.classList.add('hidden');
+                matSelector.classList.add('hidden');
+                teleBtn.classList.add('hidden');
+            } else if (step === 2) {
+                matrixTitle.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Détection des Anomalies (<span class="math-tex">P</span>)`;
+                matrixBadge.textContent = "Non Irréductible / Non Ergodique";
+                matrixBadge.className = "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold bg-red-500/20 text-red-400 border border-red-500/30";
+                teleControls.classList.add('hidden');
+                matSelector.classList.add('hidden');
+                teleBtn.classList.add('hidden');
+            } else if (step === 3) {
+                matrixTitle.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles text-emerald-400"></i> Matrice de Google (<span class="math-tex">G</span>)`;
+                matrixBadge.textContent = "Stochastique, Irréductible & Acyclique";
+                matrixBadge.className = "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+                teleControls.classList.remove('hidden');
+                matSelector.classList.remove('hidden');
+                teleBtn.classList.remove('hidden');
+                setMatrixView('G');
+            }
+
+            if (step !== 5) {
+                updateLegend();
+                updateInfoCard();
+                resizeCanvas();
+            }
+            if (step <= 3) renderMatrix();
+        }
+
+        function updateLegend() {
+            const legend = document.getElementById('graph-legend');
+            if (currentStep === 1) {
+                legend.innerHTML = `
+                    <div class="flex items-center gap-2 text-slate-400"><span class="w-3 h-3 rounded-full border-2 border-slate-500 bg-slate-800"></span> Nœud Web</div>
+                    <div class="flex items-center gap-2 text-slate-400"><span class="w-5 border-b-2 border-dashed border-slate-500"></span> Lien Hypertexte</div>
+                `;
+            } else if (currentStep === 2) {
+                legend.innerHTML = `
+                    <div class="flex items-center gap-2 text-red-400"><span class="w-3 h-3 rounded-full border-2 border-red-500 bg-red-500/20"></span> Puits (<span class="math-tex">C</span>)</div>
+                    <div class="flex items-center gap-2 text-amber-400"><span class="w-3 h-3 rounded-full border-2 border-amber-500 bg-amber-500/20"></span> Cycle (<span class="math-tex">D \\leftrightarrow E</span>)</div>
+                    <div class="flex items-center gap-2 text-purple-400"><span class="w-3 h-3 rounded-full border-2 border-purple-500 bg-purple-500/20"></span> Déconnectés (<span class="math-tex">F \\leftrightarrow G</span>)</div>
+                `;
+            } else if (currentStep === 3) {
+                legend.innerHTML = `
+                    <div class="flex items-center gap-2 text-sky-400"><span class="w-5 border-b-2 border-dashed border-sky-400"></span> Lien réel (<span class="math-tex">d</span>)</div>
+                    <div class="flex items-center gap-2 text-purple-400"><span class="w-5 border-b border-dashed border-purple-400"></span> Saut Aléatoire (<span class="math-tex">1-d</span>)</div>
+                    <div class="flex items-center gap-2 text-rose-400"><span class="w-2.5 h-2.5 rounded-full border border-rose-400 border-dashed"></span> Auto-boucle (<span class="math-tex">i \\to i</span>)</div>
+                `;
+            } else if (currentStep === 4) {
+                legend.innerHTML = `
+                    <div class="flex items-center gap-2 text-sky-400"><span class="w-3.5 h-3.5 rounded-full border-2 border-sky-400 bg-sky-500/20"></span> Surfeur actif &amp; score <span class="math-tex">\\pi_i^*</span></div>
+                    <div class="flex items-center gap-2 text-red-400"><span class="w-3 h-3 rounded-full border-2 border-red-400 bg-red-500/15"></span> Puits absorbant (<span class="math-tex">C</span>)</div>
+                    <div class="flex items-center gap-2 text-slate-400"><span class="w-5 border-b-2 border-dashed border-slate-400"></span> Arcs orientés (courbés si <span class="math-tex">\\leftrightarrow</span>)</div>
+                `;
+            }
+        }
+
+        function updateInfoCard() {
+            const title = document.getElementById('info-card-title');
+            const content = document.getElementById('info-card-content');
+            const footer = document.getElementById('info-card-footer');
+
+            if (currentStep === 1) {
+                title.innerHTML = `<i class="fa-solid fa-circle-info text-sky-400"></i> Partie 1 : Problématique &amp; Deux Approches de Calcul`;
+                content.innerHTML = `
+                    <p><strong>Problématique :</strong> Comment mesurer l'importance d'une page Web ? L'objectif est de déterminer la <strong>fréquence limite de visite</strong> <span class="math-tex">\\pi_i</span> de chaque sommet <span class="math-tex">i</span> d'un graphe orienté (<span class="math-tex">N=7</span>) modélisé par la matrice de transition <span class="math-tex">P</span> :</p>
+                    <div class="p-2 bg-slate-950 rounded-xl border border-slate-800 text-center font-mono text-sky-300 text-xs">
+                        <div class="math-tex block-math">P_{ij} = \\begin{cases} \\frac{1}{\\text{deg}_{out}(i)} & \\text{si } (i \\to j) \\in E \\ 0 & \\text{sinon} \\end{cases}</div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                            <div class="font-bold text-amber-300 mb-0.5">1. Approche Empirique</div>
+                            <p class="text-slate-300">Simuler une <strong>marche aléatoire</strong> sur <span class="math-tex">T</span> pas et compter la proportion empirique de passages sur chaque page.</p>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                            <div class="font-bold text-sky-300 mb-0.5">2. Approche Théorique</div>
+                            <p class="text-slate-300">Calculer directement la distribution stationnaire <span class="math-tex">\\pi</span> par voie algébrique (<span class="math-tex">\\pi P = \\pi</span>).</p>
+                        </div>
+                    </div>
+                `;
+                footer.innerHTML = `<span>Objectif : comparer fréquence empirique et distribution théorique</span><span class="text-slate-500">Matrice <span class="math-tex">P</span></span>`;
+            } else if (currentStep === 2) {
+                title.innerHTML = `<i class="fa-solid fa-bug text-amber-400"></i> Partie 2 : Les 3 Problèmes Majeurs du Web`;
+                content.innerHTML = `
+                    <ul class="space-y-2 text-xs md:text-sm">
+                        <li class="p-2 rounded-lg bg-red-500/10 border border-red-500/20"><strong class="text-red-400">1. Nœud Puits (C) :</strong> Aucun lien sortant (<span class="math-tex">\\text{deg}_{out}(C)=0</span>). La ligne C est nulle (<span class="math-tex">\\sum=0</span>). Le surfeur y est piégé et la probabilité totale s'évapore.</li>
+                        <li class="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20"><strong class="text-amber-400">2. Cycle Périodique Fermé (D <span class="math-tex">\\leftrightarrow</span> E) :</strong> Aucun arc sortant hors de {D, E} (F <span class="math-tex">\\to</span> D y entre sans sortie). Une fois entré, le surfeur tourne en boucle infinie.</li>
+                        <li class="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20"><strong class="text-purple-400">3. Composantes Déconnectées :</strong> Impossible de naviguer de la composante 2 vers la composante 1. Le graphe n'est pas <em>irréductible</em>.</li>
+                    </ul>
+                `;
+                footer.innerHTML = `<span class="text-amber-400 font-medium"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Échec du théorème de Perron-Frobenius classique</span>`;
+            } else if (currentStep === 3) {
+                title.innerHTML = `<i class="fa-solid fa-bolt text-emerald-400"></i> Partie 3 : Saut Aléatoire, Chaîne de Markov &amp; Perron-Frobenius`;
+                content.innerHTML = `
+                    <p>Pour résoudre les puits et les blocages, Google définit la matrice <span class="math-tex">G</span> combinant navigation réelle (<span class="math-tex">d</span>) et téléportation uniforme (<span class="math-tex">1-d</span>) :</p>
+                    <div class="p-2.5 bg-slate-950 rounded-xl border border-slate-800 text-center font-mono text-emerald-300 shadow-inner">
+                        <div class="math-tex block-math">G = d \\cdot P^* + (1-d) \\frac{1}{N} E</div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs space-y-1">
+                        <div class="font-bold text-emerald-300 flex items-center gap-1.5">
+                            <i class="fa-solid fa-link"></i> Chaîne de Markov &amp; Théorème de Perron-Frobenius
+                        </div>
+                        <p class="text-slate-300">Pour <span class="math-tex">d &lt; 1</span>, tous les coefficients de <span class="math-tex">G</span> sont strictement positifs (<span class="math-tex">G_{ij} \\ge \\frac{1-d}{N} &gt; 0</span>). La <strong>chaîne de Markov</strong> associée est donc <strong>irréductible</strong> et <strong>apériodique</strong> (primitive). Le <strong>théorème de Perron-Frobenius</strong> garantit alors l'existence et l'unicité d'une distribution stationnaire <span class="math-tex">\\pi^* &gt; 0</span> (<span class="math-tex">\\pi^* G = \\pi^*</span>) vers laquelle toute marche converge.</p>
+                    </div>
+                `;
+                footer.innerHTML = `<span class="text-emerald-400 font-medium"><i class="fa-solid fa-check-circle mr-1"></i> Perron-Frobenius applicable : unicité de <span class="math-tex">\\pi^*</span> garantie</span>`;
+            } else if (currentStep === 4) {
+                title.innerHTML = `<i class="fa-solid fa-scale-balanced text-sky-400"></i> Partie 5 : Marche Aléatoire vs PageRank sur le Graphe`;
+                content.innerHTML = `
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                        <div class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                            <div class="font-bold text-amber-300 mb-1">1. Approche Empirique (Marche Aléatoire)</div>
+                            <p class="text-slate-300">On simule un surfeur sur <span class="math-tex">T</span> pas. Par le théorème ergodique : <span class="math-tex">\\hat{\\pi}_i(T) = \\frac{N_i(T)}{T} \\xrightarrow[T\\to\\infty]{p.s.} \\pi_i^*</span>, avec une erreur lente en <span class="math-tex">\\mathcal{O}(1/\\sqrt{T})</span>.</p>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                            <div class="font-bold text-sky-300 mb-1">2. Approche Théorique (PageRank)</div>
+                            <p class="text-slate-300">On résout directement le vecteur propre à gauche <span class="math-tex">\\pi^* = \\pi^* G</span> par la <strong>méthode des puissances</strong> : <span class="math-tex">\\pi^{(k+1)} = \\pi^{(k)} G</span>.</p>
+                        </div>
+                    </div>
+                `;
+                footer.innerHTML = `<span class="text-sky-400 font-medium"><i class="fa-solid fa-check mr-1"></i> Les tailles des sommets du graphe reflètent <span class="math-tex">\\pi_i^*</span></span>`;
+            }
+
+            renderAllKaTeX();
+        }
+
+        // Render KaTeX for all elements with class 'math-tex'
+        function renderAllKaTeX() {
+            if (!window.katex) return;
+
+            document.querySelectorAll('.math-tex').forEach(el => {
+                let texText = el.getAttribute('data-tex') || el.textContent;
+                if (!el.getAttribute('data-tex')) {
+                    el.setAttribute('data-tex', texText);
+                }
+                const isBlock = el.classList.contains('block-math');
+                try {
+                    katex.render(texText, el, {
+                        displayMode: isBlock,
+                        throwOnError: false
+                    });
+                } catch (e) {
+                    console.error("KaTeX Error:", e);
+                }
+            });
+        }
+
+        // RANDOM SURFER ANIMATION
+        function toggleRandomSurfer() {
+            isSurferRunning = !isSurferRunning;
+            const btnText = document.getElementById('surfer-btn-text');
+            const statusBox = document.getElementById('surfer-status');
+
+            if (isSurferRunning) {
+                btnText.textContent = "Arrêter Surfeur";
+                statusBox.classList.remove('hidden');
+                updateSurferStatus();
+
+                surferInterval = setInterval(() => {
+                    moveSurfer();
+                }, 1000);
+            } else {
+                btnText.textContent = "Simuler Surfeur";
+                statusBox.classList.add('hidden');
+                clearInterval(surferInterval);
+            }
+            drawGraph();
+        }
+
+        function moveSurfer() {
+            let M = [];
+            if (currentStep === 1 || currentStep === 2) {
+                M = getTransitionMatrixP();
+            } else {
+                M = getGoogleMatrixG();
+            }
+
+            const probs = M[surferNode];
+            const rand = Math.random();
+            let cumulative = 0;
+            let nextNode = surferNode;
+
+            for (let j = 0; j < probs.length; j++) {
+                cumulative += probs[j];
+                if (rand <= cumulative) {
+                    nextNode = j;
+                    break;
+                }
+            }
+
+            surferNode = nextNode;
+            if (currentStep === 4) {
+                mcVisitCounts[surferNode]++;
+                mcTotalSteps++;
+                renderApproachesUI();
+            }
+            updateSurferStatus();
+            drawGraph();
+        }
+
+        function updateSurferStatus() {
+            const statusText = document.getElementById('surfer-status-text');
+            statusText.textContent = `Surfeur sur la page ${nodes[surferNode].label}`;
+        }
+
+        // GRAPH INTERACTIVITY (NODE DRAGGING)
+        let isDragging = false;
+        let dragTarget = null;
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            nodes.forEach(node => {
+                const nx = node.x * w;
+                const ny = node.y * h;
+                const dist = Math.hypot(mouseX - nx, mouseY - ny);
+
+                if (dist <= 30) {
+                    isDragging = true;
+                    dragTarget = node;
+                }
+            });
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDragging && dragTarget) {
+                const rect = canvas.getBoundingClientRect();
+                dragTarget.x = Math.max(0.06, Math.min(0.94, (e.clientX - rect.left) / canvas.width));
+                dragTarget.y = Math.max(0.08, Math.min(0.92, (e.clientY - rect.top) / canvas.height));
+                drawGraph();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDragging = false;
+            dragTarget = null;
+        });
+
+        // INITIALIZATION ROBUSTE (DOMContentLoaded + load + fallback immédiat)
+        function initApp() {
+            resizeCanvas();
+            setStep(1);
+            setTimeout(() => {
+                resizeCanvas();
+                drawGraph();
+            }, 80);
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initApp);
+        } else {
+            initApp();
+        }
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            drawGraph();
+            renderAllKaTeX();
+        });
+    </script>
+</body>
+</html>
+```
